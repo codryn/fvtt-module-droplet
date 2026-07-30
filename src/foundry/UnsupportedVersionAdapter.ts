@@ -30,27 +30,37 @@ export class UnsupportedVersionAdapter implements FoundryAdapter {
     return game.user?.isGM ?? false;
   }
 
-  public registerSetting<K extends SettingKey>(_key: K, _definition: SettingDefinition<K>): void {
+  public registerSetting<K extends SettingKey>(key: K, definition: SettingDefinition<K>): void {
+    void key;
+    void definition;
     return undefined;
   }
 
-  public getSetting<K extends SettingKey>(_key: K): SettingValue<K> {
+  public getSetting<K extends SettingKey>(key: K): SettingValue<K> {
+    void key;
     throw new Error(`${MODULE_ID} settings are unavailable on unsupported Foundry versions.`);
   }
 
-  public async setSetting<K extends SettingKey>(_key: K, _value: SettingValue<K>): Promise<void> {
+  public setSetting<K extends SettingKey>(key: K, value: SettingValue<K>): Promise<void> {
+    void key;
+    void value;
+    return Promise.resolve();
+  }
+
+  public onReady(handler: () => void): void {
+    void handler;
     return undefined;
   }
 
-  public onReady(_handler: () => void): void {
-    return undefined;
-  }
-
-  public onRender(_hookName: string, _handler: (root: HTMLElement, context: unknown) => void): HookId {
+  public onRender(hookName: string, handler: (root: HTMLElement, context: unknown) => void): HookId {
+    void hookName;
+    void handler;
     return 0;
   }
 
-  public off(_hookName: string, _id: HookId): void {
+  public off(hookName: string, id: HookId): void {
+    void hookName;
+    void id;
     return undefined;
   }
 

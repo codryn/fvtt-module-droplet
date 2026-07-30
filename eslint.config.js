@@ -6,6 +6,7 @@ import tseslint from "typescript-eslint";
 export default tseslint.config(
   {
     ignores: [
+      "eslint.config.js",
       "dist/**",
       "coverage/**",
       "playwright-report/**",
@@ -37,7 +38,20 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ["@/dropbox/*", "../dropbox/*", "../../dropbox/*"],
+              group: [
+                "@/dropbox/DropboxClient",
+                "@/dropbox/DropboxHttpClient",
+                "@/dropbox/endpoints",
+                "@/dropbox/rateLimit",
+                "../dropbox/DropboxClient",
+                "../dropbox/DropboxHttpClient",
+                "../dropbox/endpoints",
+                "../dropbox/rateLimit",
+                "../../dropbox/DropboxClient",
+                "../../dropbox/DropboxHttpClient",
+                "../../dropbox/endpoints",
+                "../../dropbox/rateLimit"
+              ],
               message: "UI layers must not import Dropbox transport directly."
             }
           ]

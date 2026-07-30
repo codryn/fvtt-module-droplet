@@ -12,7 +12,6 @@ import type { FoundryAdapter } from "@/foundry/FoundryAdapter";
 import type {
   SettingDefinition,
   SettingKey,
-  SettingValue,
 } from "@/types/settings";
 import { validateSettingValue } from "@/settings/validators";
 
@@ -158,20 +157,28 @@ const SETTING_DEFINITIONS: SettingDefinitionMap = {
 
 const SETTING_KEYS = Object.keys(SETTING_DEFINITIONS) as SettingKey[];
 
+function registerSetting<K extends SettingKey>(adapter: FoundryAdapter, key: K): void {
+  adapter.registerSetting(key, SETTING_DEFINITIONS[key]);
+}
+
+async function sanitizeSetting<K extends SettingKey>(adapter: FoundryAdapter, key: K): Promise<void> {
+  const currentValue = adapter.getSetting(key);
+  const sanitizedValue = validateSettingValue(key, currentValue);
+
+  if (JSON.stringify(currentValue) !== JSON.stringify(sanitizedValue)) {
+    await adapter.setSetting(key, sanitizedValue);
+  }
+}
+
 export function registerSettings(adapter: FoundryAdapter): void {
   for (const key of SETTING_KEYS) {
-    adapter.registerSetting(key, SETTING_DEFINITIONS[key]);
+    registerSetting(adapter, key);
   }
 }
 
 export function validateRegisteredSettings(adapter: FoundryAdapter): void {
   for (const key of SETTING_KEYS) {
-    const currentValue = adapter.getSetting(key);
-    const sanitizedValue = validateSettingValue(key, currentValue);
-
-    if (JSON.stringify(currentValue) !== JSON.stringify(sanitizedValue)) {
-      void adapter.setSetting(key, sanitizedValue as SettingValue<typeof key>);
-    }
+    void sanitizeSetting(adapter, key);
   }
 }
 

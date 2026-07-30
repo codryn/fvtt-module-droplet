@@ -10,9 +10,11 @@ import type {
   ThumbnailResult,
 } from "@/dropbox/DropboxClient";
 import { DROPBOX_ENDPOINTS, type DropboxEndpointName } from "@/dropbox/endpoints";
-import { createDropletError, mapDropboxError } from "@/dropbox/errors";
+import { DropletError, createDropletError, mapDropboxError } from "@/dropbox/errors";
 import { createRateLimitDelayMs, waitForDelay } from "@/dropbox/rateLimit";
 import type { Logger } from "@/diagnostics/Logger";
+
+type JsonRecord = Record<string, unknown>;
 
 interface DropboxHttpClientOptions {
   readonly getAccessToken: () => Promise<string> | string;
@@ -33,6 +35,25 @@ interface RpcErrorBody {
     };
     readonly retry_after?: number;
   };
+}
+
+function asJsonRecord(value: unknown): JsonRecord | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as JsonRecord;
+}
+
+function asJsonRecordArray(value: unknown): JsonRecord[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    const record = asJsonRecord(entry);
+    return record ? [record] : [];
+  });
 }
 
 export class DropboxHttpClient implements DropboxClient {
@@ -60,9 +81,13 @@ export class DropboxHttpClient implements DropboxClient {
 
   public getThumbnailBatch(entries: readonly ThumbnailRequest[], signal?: AbortSignal): Promise<readonly ThumbnailResult[]> {
     return this.requestJson("getThumbnailBatch", { entries }, signal).then((payload) => {
-      const entriesPayload = Array.isArray(payload.entries) ? payload.entries : [];
+      const entriesPayload = asJsonRecordArray(payload.entries);
+
       return entriesPayload.map((entry) => ({
-        path: typeof entry.metadata?.path_lower === "string" ? entry.metadata.path_lower : "",
+        path: (() => {
+          const metadata = asJsonRecord(entry.metadata);
+          return typeof metadata?.path_lower === "string" ? metadata.path_lower : "";
+        })(),
         metadataTag: entry[".tag"] === "success" ? "success" : "failure",
         thumbnail: typeof entry.thumbnail === "string" ? entry.thumbnail : null,
       }));
@@ -71,7 +96,7 @@ export class DropboxHttpClient implements DropboxClient {
 
   public async listSharedLinks(path: string, signal?: AbortSignal): Promise<readonly SharedLinkMetadata[]> {
     const payload = await this.requestJson("listSharedLinks", { path, direct_only: true }, signal);
-    const links = Array.isArray(payload.links) ? payload.links : [];
+    const links = asJsonRecordArray(payload.links);
     return links.map((link) => this.mapSharedLink(link));
   }
 
@@ -82,10 +107,12 @@ export class DropboxHttpClient implements DropboxClient {
 
   public async getCurrentAccount(signal?: AbortSignal): Promise<AccountSummary> {
     const payload = await this.requestJson("getCurrentAccount", undefined, signal);
+    const name = asJsonRecord(payload.name);
+
     return {
       accountId: typeof payload.account_id === "string" ? payload.account_id : "",
       email: typeof payload.email === "string" ? payload.email : "",
-      displayName: typeof payload.name?.display_name === "string" ? payload.name.display_name : "",
+      displayName: typeof name?.display_name === "string" ? name.display_name : "",
     };
   }
 
@@ -98,27 +125,35 @@ export class DropboxHttpClient implements DropboxClient {
     body: Record<string, unknown> | undefined,
     signal?: AbortSignal,
     attempt = 1,
-  ): Promise<Record<string, any>> {
+  ): Promise<JsonRecord> {
     const endpoint = DROPBOX_ENDPOINTS[endpointName];
     const accessToken = await this.options.getAccessToken();
+    const requestInit: RequestInit = {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    };
+
+    if (body) {
+      requestInit.body = JSON.stringify(body);
+    }
+
+    if (signal) {
+      requestInit.signal = signal;
+    }
 
     try {
-      const response = await this.fetchImpl(`${endpoint.host}${endpoint.path}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: body ? JSON.stringify(body) : undefined,
-        signal,
-      });
+      const response = await this.fetchImpl(`${endpoint.host}${endpoint.path}`, requestInit);
 
       if (response.ok) {
         if (response.status === 204) {
           return {};
         }
 
-        return (await response.json()) as Record<string, any>;
+        const payload = asJsonRecord(await response.json());
+        return payload ?? {};
       }
 
       const errorBody = await this.readErrorBody(response);
@@ -139,12 +174,18 @@ export class DropboxHttpClient implements DropboxClient {
         return this.requestJson(endpointName, body, signal, attempt + 1);
       }
 
-      throw mapDropboxError({
+      const errorContext = {
         status: response.status,
         endpoint: endpointName,
-        errorTag: this.extractErrorTag(errorBody),
-        errorSummary: errorBody.error_summary,
         retryAfterMs,
+      } as const;
+      const errorTag = this.extractErrorTag(errorBody);
+      const errorSummary = errorBody.error_summary;
+
+      throw mapDropboxError({
+        ...errorContext,
+        ...(errorTag ? { errorTag } : {}),
+        ...(errorSummary ? { errorSummary } : {}),
       });
     } catch (error) {
       if (error instanceof DropletError) {
@@ -167,7 +208,23 @@ export class DropboxHttpClient implements DropboxClient {
     const contentType = response.headers.get("Content-Type") ?? "";
 
     if (contentType.includes("application/json")) {
-      return (await response.json()) as RpcErrorBody;
+      const payload = asJsonRecord(await response.json());
+      const error = asJsonRecord(payload?.error);
+      const reason = asJsonRecord(error?.reason);
+      const path = asJsonRecord(error?.path);
+      const errorPayload = error
+        ? {
+            ...(typeof error[".tag"] === "string" ? { ".tag": error[".tag"] } : {}),
+            ...(typeof error.retry_after === "number" ? { retry_after: error.retry_after } : {}),
+            ...(reason && typeof reason[".tag"] === "string" ? { reason: { ".tag": reason[".tag"] } } : {}),
+            ...(path && typeof path[".tag"] === "string" ? { path: { ".tag": path[".tag"] } } : {}),
+          }
+        : undefined;
+
+      return {
+        ...(typeof payload?.error_summary === "string" ? { error_summary: payload.error_summary } : {}),
+        ...(errorPayload ? { error: errorPayload } : {}),
+      };
     }
 
     const text = await response.text();
@@ -178,8 +235,8 @@ export class DropboxHttpClient implements DropboxClient {
     return errorBody.error?.reason?.[".tag"] ?? errorBody.error?.path?.[".tag"] ?? errorBody.error?.[".tag"];
   }
 
-  private mapListFolderResult(payload: Record<string, any>): ListFolderResult {
-    const entries = Array.isArray(payload.entries) ? payload.entries.map((entry) => this.mapEntryMetadata(entry)) : [];
+  private mapListFolderResult(payload: JsonRecord): ListFolderResult {
+    const entries = asJsonRecordArray(payload.entries).map((entry) => this.mapEntryMetadata(entry));
     return {
       entries,
       cursor: typeof payload.cursor === "string" ? payload.cursor : null,
@@ -187,7 +244,7 @@ export class DropboxHttpClient implements DropboxClient {
     };
   }
 
-  private mapEntryMetadata(payload: Record<string, any>): EntryMetadata {
+  private mapEntryMetadata(payload: JsonRecord): EntryMetadata {
     return {
       tag: payload[".tag"] === "folder" ? "folder" : "file",
       id: typeof payload.id === "string" ? payload.id : "",
@@ -200,7 +257,7 @@ export class DropboxHttpClient implements DropboxClient {
     };
   }
 
-  private mapSharedLink(payload: Record<string, any>): SharedLinkMetadata {
+  private mapSharedLink(payload: JsonRecord): SharedLinkMetadata {
     return {
       url: typeof payload.url === "string" ? payload.url : "",
       id: typeof payload.id === "string" ? payload.id : null,

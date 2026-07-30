@@ -16,12 +16,12 @@
 
 **Purpose**: Close the gaps in the existing scaffold. `package.json`, `tsconfig.json`, `vite.config.ts`, `vitest.config.ts`, `playwright.config.ts`, `eslint.config.js`, `.prettierrc`, `static/module.json`, `static/lang/en.json`, and the CI and release workflows already exist; these tasks extend them rather than create them.
 
-- [ ] T001 Configure the module build output, entry points, and path aliases in vite.config.ts, tsconfig.json, and package.json
-- [ ] T002 Create the test tree and shared Vitest setup in tests/unit/.gitkeep, tests/integration/.gitkeep, tests/fixtures/.gitkeep, tests/manual/.gitkeep, and vitest.config.ts
-- [ ] T003 [P] Add the import-boundary rule enforcing the five dependency rules from plan.md in eslint.config.js
-- [ ] T004 [P] Add the lint rule banning `console.*` outside src/diagnostics/Logger.ts in eslint.config.js
-- [ ] T005 [P] Complete the manifest fields — id, esmodules, styles, languages, compatibility range, `socket: false`, empty relationships — in static/module.json
-- [ ] T006 [P] Extend CI to run lint, typecheck, unit tests, build, and a token-shaped-string scan over the repository in .github/workflows/ci.yml
+- [X] T001 Configure the module build output, entry points, and path aliases in vite.config.ts, tsconfig.json, and package.json
+- [X] T002 Create the test tree and shared Vitest setup in tests/unit/.gitkeep, tests/integration/.gitkeep, tests/fixtures/.gitkeep, tests/manual/.gitkeep, and vitest.config.ts
+- [X] T003 [P] Add the import-boundary rule enforcing the five dependency rules from plan.md in eslint.config.js
+- [X] T004 [P] Add the lint rule banning `console.*` outside src/diagnostics/Logger.ts in eslint.config.js
+- [X] T005 [P] Complete the manifest fields — id, esmodules, styles, languages, compatibility range, `socket: false`, empty relationships — in static/module.json
+- [X] T006 [P] Extend CI to run lint, typecheck, unit tests, build, and a token-shaped-string scan over the repository in .github/workflows/ci.yml
 
 ---
 
@@ -31,18 +31,18 @@
 
 **⚠️ CRITICAL**: No user story work starts before this phase completes.
 
-- [ ] T007 Define shared constants and core types in src/constants.ts, src/types/errors.ts, and src/types/settings.ts
-- [ ] T008 [P] Implement the FoundryAdapter interface, version selection, and the unsupported-version fallback in src/foundry/FoundryAdapter.ts, src/foundry/selectAdapter.ts, and src/foundry/UnsupportedVersionAdapter.ts
-- [ ] T009 [P] Implement the v14 and v13 adapter shells in src/foundry/v14/FoundryV14Adapter.ts and src/foundry/v13/FoundryV13Adapter.ts
-- [ ] T010 [P] Register and validate every settings key from data-model.md, including thumbnailBatchSize and thumbnailBatchesInFlight, in src/settings/registerSettings.ts and src/settings/validators.ts
-- [ ] T011 [P] Define the DropboxClient interface and the explicit endpoint host table separating api.dropboxapi.com from content.dropboxapi.com in src/dropbox/DropboxClient.ts and src/dropbox/endpoints.ts
+- [X] T007 Define shared constants and core types in src/constants.ts, src/types/errors.ts, and src/types/settings.ts
+- [X] T008 [P] Implement the FoundryAdapter interface, version selection, and the unsupported-version fallback in src/foundry/FoundryAdapter.ts, src/foundry/selectAdapter.ts, and src/foundry/UnsupportedVersionAdapter.ts
+- [X] T009 [P] Implement the v14 and v13 adapter shells in src/foundry/v14/FoundryV14Adapter.ts and src/foundry/v13/FoundryV13Adapter.ts
+- [X] T010 [P] Register and validate every settings key from data-model.md, including thumbnailBatchSize and thumbnailBatchesInFlight, in src/settings/registerSettings.ts and src/settings/validators.ts
+- [X] T011 [P] Define the DropboxClient interface and the explicit endpoint host table separating api.dropboxapi.com from content.dropboxapi.com in src/dropbox/DropboxClient.ts and src/dropbox/endpoints.ts
 - [ ] T012 [P] Implement the DropletError hierarchy and the Dropbox status-and-tag mapping from contracts/error-model.md in src/dropbox/errors.ts and src/types/errors.ts
-- [ ] T013 [P] Implement retry scheduling that honors the `Retry-After` header and the `RateLimitError.retry_after` body field, taking the larger, with bounded attempts in src/dropbox/rateLimit.ts
-- [ ] T014 Implement the transport core — POST, `Authorization: Bearer` header, JSON body, abort support, host routing, and no token in any URL per ADR-010 — in src/dropbox/DropboxHttpClient.ts
-- [ ] T015 [P] Implement localization helpers and baseline strings in src/localization/t.ts and static/lang/en.json
-- [ ] T016 [P] Implement redaction, logging, and diagnostics foundations in src/diagnostics/Redactor.ts, src/diagnostics/Logger.ts, and src/diagnostics/DiagnosticsService.ts
+- [X] T013 [P] Implement retry scheduling that honors the `Retry-After` header and the `RateLimitError.retry_after` body field, taking the larger, with bounded attempts in src/dropbox/rateLimit.ts
+- [X] T014 Implement the transport core — POST, `Authorization: Bearer` header, JSON body, abort support, host routing, and no token in any URL per ADR-010 — in src/dropbox/DropboxHttpClient.ts
+- [X] T015 [P] Implement localization helpers and baseline strings in src/localization/t.ts and static/lang/en.json
+- [X] T016 [P] Implement redaction, logging, and diagnostics foundations in src/diagnostics/Redactor.ts, src/diagnostics/Logger.ts, and src/diagnostics/DiagnosticsService.ts
 - [ ] T017 [P] Author Dropbox request and response fixtures from contracts/dropbox-client.md, pinning hosts and error unions, in tests/fixtures/dropbox/
-- [ ] T018 Wire bootstrap — adapter selection, settings registration, hook registration, diagnostics startup — in src/module.ts
+- [X] T018 Wire bootstrap — adapter selection, settings registration, hook registration, diagnostics startup — in src/module.ts
 
 **Checkpoint**: The module loads, selects an adapter, registers settings, and exposes the shared seams. No Dropbox request is issued during `init` or `ready`.
 

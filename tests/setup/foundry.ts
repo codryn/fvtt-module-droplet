@@ -93,7 +93,7 @@ foundryGlobals.game = {
   settings: {
     register: vi.fn<(namespace: string, key: string, definition: Record<string, unknown>) => void>(),
     get: vi.fn<(namespace: string, key: string) => unknown>(() => null),
-    set: vi.fn<(namespace: string, key: string, value: unknown) => Promise<unknown>>(async (_namespace, _key, value) => value),
+    set: vi.fn<(namespace: string, key: string, value: unknown) => Promise<unknown>>((_namespace, _key, value) => Promise.resolve(value)),
   },
   modules: new Map(),
 };

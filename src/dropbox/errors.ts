@@ -102,11 +102,15 @@ export function mapDropboxError(context: DropboxErrorContext): DropletError {
   }
 
   if (status === 429) {
+    const recovery = typeof retryAfterMs === "number"
+      ? { kind: "retry" as const, afterMs: retryAfterMs }
+      : { kind: "retry" as const };
+
     return createDropletError("RateLimited", {
       detail,
       cause,
-      retryAfterMs,
-      recovery: { kind: "retry", afterMs: retryAfterMs ?? undefined },
+      recovery,
+      ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
     });
   }
 
