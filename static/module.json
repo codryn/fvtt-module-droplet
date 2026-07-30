@@ -1,0 +1,19 @@
+{
+  "id": "droplet",
+  "type": "module",
+  "title": "Droplet",
+  "description": "Browse Dropbox assets from Foundry without copying them into Foundry storage.",
+  "version": "0.1.0",
+  "authors": [{ "name": "Droplet Contributors" }],
+  "compatibility": { "minimum": "13", "verified": "14" },
+  "esmodules": ["module.js"],
+  "styles": ["styles/droplet.css"],
+  "languages": [{ "lang": "en", "name": "English", "path": "lang/en.json" }],
+  "socket": false,
+  "relationships": { "systems": [], "requires": [], "recommends": [], "conflicts": [] },
+  "manifest": "https://github.com/codryn/fvtt-module-droplet/releases/latest/download/module.json",
+  "download": "https://github.com/codryn/fvtt-module-droplet/releases/download/v0.1.0/droplet.zip",
+  "url": "https://github.com/codryn/fvtt-module-droplet",
+  "readme": "https://github.com/codryn/fvtt-module-droplet#readme",
+  "bugs": "https://github.com/codryn/fvtt-module-droplet/issues"
+}

@@ -1,0 +1,25 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test
+      - run: npm run build
+      - name: Assert release contents
+        run: test -f dist/module.json && test -f dist/module.js && test -f dist/styles/droplet.css && ! find dist -name '*.map' | grep . && ! find dist -path '*/fixtures/*' | grep . && ! find dist -name '.env*' | grep .
+      - name: Reject committed Dropbox secrets
+        run: '! git grep -En "(sl\.[A-Za-z0-9_-]{40,}|refresh_token[[:space:]]*[:=][[:space:]]*[^$<{])" -- . ":(exclude)package-lock.json"'
