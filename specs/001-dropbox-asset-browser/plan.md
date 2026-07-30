@@ -52,7 +52,8 @@ Hosting: The Forge (primary) and self-hosted (secondary).
 
 **Performance Goals**: first page of a 1,000-entry folder rendered within 3 s on broadband;
 zero shared-link API calls during listing; at most one `list_folder` request per page;
-thumbnail concurrency capped (default 6); no main-thread block longer than 50 ms while paging.
+thumbnails requested in batches of at most 25 (the documented Dropbox ceiling) with at most 2
+batches in flight; no main-thread block longer than 50 ms while paging.
 
 **Constraints**: no backend service; no embedded Dropbox app secret; no Node.js runtime APIs;
 no telemetry; no monkey-patching of Foundry core; production bundle under 100 KB minified
@@ -71,7 +72,7 @@ designed for additional surfaces.
 | Gate | Status | Evidence / action |
 |---|---|---|
 | Security and privacy | PASS with conditions | PKCE mandated (ADR-001/002); no secret shipped; central redaction layer specified; scopes minimized (see the endpoint matrix); root enforced in the service layer. Condition: no token may be written to a world setting — the design avoids world scope entirely, and RS-02 confirms the documentation claim. |
-| Stable reference | PASS | ADR-005 fixes the persisted URL form; `files/get_temporary_link` is never persisted and is confined to previews; reuse and deduplication logic is specified with tests. |
+| Stable reference | PASS | ADR-005 fixes the persisted URL form; `files/get_temporary_link` is not used at all — Dropbox documents that its links expire in four hours and "should not be used to display content directly in the browser" (RE-013); reuse and deduplication logic is specified with tests. |
 | Foundry compatibility | PASS with conditions | v14 surfaces are named from the 14.365 public API (`foundry.applications.apps.FilePicker`, `renderSceneConfig` as an instance of the documented generic `renderApplicationV2` hook, `CONFIG.ux`); v13 differences are isolated behind `FoundryAdapter`. Condition: RS-07 must confirm v13 hook and class names on a real v13 install before any v13 compatibility claim ships. |
 | Architecture | PASS | Component boundaries below map one-to-one onto the constitution's required component list, with enforced dependency direction. |
 | Test and evidence | CONDITIONAL | RS-06 (Forge CSP/CORS) is an unresolved blocker; RS-04 (shared-link form) and RS-05 (media validation under CORS) need live confirmation. Phase 0 schedules all three as spikes ahead of phases 6 and 7. |
@@ -81,12 +82,19 @@ designed for additional surfaces.
 
 | Gate | Status | Notes |
 |---|---|---|
-| Security and privacy | PASS | No entity in the data model carries a token in world scope or in a document. `DropletConnectionState` is client-scope only and its refresh token never leaves the GM browser. The diagnostic report is defined as a redacted projection. |
-| Stable reference | PASS | `SharedLinkMapping` stores only canonical `raw=1` URLs; the `resolveAssetUrl` contract forbids returning a temporary link. |
+| Security and privacy | PASS | No entity in the data model carries a token in world scope or in a document. `DropletConnectionState` is client-scope only and its refresh token never leaves the GM browser. The diagnostic report is defined as a redacted projection. ADR-010 additionally keeps the access token out of request URLs, declining Dropbox's documented pre-flight-avoidance mode. |
+| Stable reference | PASS | `SharedLinkMapping` stores only canonical `raw=1` URLs; the `resolveAssetUrl` contract forbids returning a temporary link, and RE-013 removed `files/get_temporary_link` from the design entirely. |
 | Foundry compatibility | PASS | The `FoundryAdapter` contract is version-agnostic; two implementations are selected at `init`; an unsupported version yields `UnsupportedVersionAdapter`, which disables integration after one notification. |
 | Architecture | PASS | No UI component imports the Dropbox transport; no Dropbox service imports Foundry globals; dependency direction is UI → services → adapters. |
 | Test and evidence | CONDITIONAL (unchanged) | RS-06 remains a blocker for phase 6/7 sign-off. Phases 1–5 are unblocked and do not depend on it. |
-| Documentation and release | PASS | Phase 1 introduced no new documentation obligation. |
+| Documentation and release | PASS | Phase 1 introduced one new documentation obligation, already folded into the Definition of Done: the README must state that revoking a file's shared link does not remove access while a parent-folder link exists. |
+
+**Effect of the Phase 0 documentation review**: reading the Dropbox HTTP API v2 reference in full
+produced four corrections rather than confirmations — the PKCE token request sends `client_id`
+**and** `code_verifier`; `get_thumbnail_batch` lives on the content host; `get_temporary_link`
+must not be used to display content in a browser; and `get_metadata` cannot be called on the root
+folder. Each is reflected above and in the endpoint matrix. None of them changed a gate outcome,
+but two of them (ADR-010, ADR-011) changed the design.
 
 **Complexity Tracking is empty** — the design introduces no constitution violation.
 
@@ -251,6 +259,36 @@ rendering; the application re-renders from store snapshots.
 **Rationale**: The constitution forbids React or Vue without concrete need, and Handlebars is
 already loaded by Foundry, so this adds zero runtime dependency.
 
+### ADR-010: Standard CORS transport; the token stays out of the URL
+
+**Status**: Accepted. **Refines checkpoint 9.**
+**Decision**: Dropbox requests use an `Authorization: Bearer` header and
+`Content-Type: application/json`, accepting a CORS pre-flight. Droplet does **not** adopt the
+documented pre-flight-avoidance mode (`arg` and `authorization` as URL parameters,
+`Content-Type: text/plain; charset=dropbox-cors-hack`, `reject_cors_preflight=true`) by default.
+**Rationale**: That mode requires the access token in a query string, where it reaches browser
+history, `Referer` headers, and proxy and CDN logs. The threat model already accepts same-origin
+script access to the token; it should not additionally spread the token through transport
+metadata to save a pre-flight that browsers cache anyway. The same documentation section is,
+however, primary-source confirmation that Dropbox supports direct browser-to-API calls, which
+underpins ADR-001.
+**Reconsideration trigger**: if RS-06 or RS-13 shows pre-flight `OPTIONS` requests are blocked in
+a supported hosting environment, the mode ships behind an explicit setting that states the
+token-exposure trade-off. It is never enabled silently.
+
+### ADR-011: Create shared links without a `settings` object
+
+**Status**: Accepted. **Supersedes the two-call conflict path.**
+**Decision**: `sharing/create_shared_link_with_settings` is called with `path` only.
+**Rationale**: The reference states that on `shared_link_already_exists` the existing link's
+metadata is returned "unless custom settings were specified in the request that could make the
+existing link incompatible with the requested settings". Droplet needs *a* link, not a link with
+particular properties, so sending `settings` would forfeit that metadata for no benefit. Omitting
+it yields the documented default (public visibility — the same outcome previously requested
+explicitly) and collapses the conflict path from two requests to one.
+**Consequence**: `list_shared_links` becomes a fallback for the case where the error carries no
+metadata, rather than the normal adoption route.
+
 ## Component Architecture
 
 ```mermaid
@@ -355,32 +393,51 @@ failure mode, and the covering test.
 
 ## Dropbox API Endpoint and Scope Matrix
 
-| Operation | Endpoint | Required scope | Used by | Cached |
-|---|---|---|---|---|
-| Exchange code | `POST https://api.dropboxapi.com/oauth2/token` (`grant_type=authorization_code`, `code_verifier`, `client_id`) | — | `DropboxOAuthService` | no |
-| Refresh | `POST https://api.dropboxapi.com/oauth2/token` (`grant_type=refresh_token`, `client_id`) | — | `DropboxOAuthService` | no |
-| Revoke | `POST /2/auth/token/revoke` | — | disconnect | no |
-| Account info | `POST /2/users/get_current_account` | `account_info.read` | status, diagnostics | session |
-| List folder | `POST /2/files/list_folder` | `files.metadata.read` | `BrowseService` | folder cache |
-| Continue listing | `POST /2/files/list_folder/continue` | `files.metadata.read` | `BrowseService` | folder cache |
-| Metadata | `POST /2/files/get_metadata` | `files.metadata.read` | root validation, deletion checks | folder cache |
-| Thumbnails | `POST https://content.dropboxapi.com/2/files/get_thumbnail_batch` | `files.content.read` | `PreviewService` | thumbnail cache |
-| List existing links | `POST /2/sharing/list_shared_links` | `sharing.read` | `SharedLinkResolver` | link cache |
-| Create link | `POST /2/sharing/create_shared_link_with_settings` | `sharing.write` | `SharedLinkResolver` | link cache |
-| Temporary link (preview only) | `POST /2/files/get_temporary_link` | `files.content.read` | `PreviewService` fallback | **never persisted** |
+Every row below was verified against the Dropbox HTTP API v2 reference during Phase 0; hosts,
+scopes, and limits are quoted, not recalled. See [research.md](research.md) RE-008 and RE-009.
+
+| Operation | Endpoint | Required scope | Used by | Cached | Verified limits and traps |
+|---|---|---|---|---|---|
+| Exchange code | `POST https://api.dropboxapi.com/oauth2/token` (`grant_type=authorization_code`, `code`, `redirect_uri?`, `code_verifier`, `client_id`) | — | `DropboxOAuthService` | no | PKCE sends `client_id` **and** `code_verifier`, no secret; `code_verifier` is 43–128 chars |
+| Refresh | `POST https://api.dropboxapi.com/oauth2/token` (`grant_type=refresh_token`, `refresh_token`, `client_id`) | — | `DropboxOAuthService` | no | returns no new refresh token; `expires_in` is seconds (example 14400) |
+| Revoke | `POST https://api.dropboxapi.com/2/auth/token/revoke` | none | disconnect | no | also disables the corresponding refresh token |
+| Account info | `POST https://api.dropboxapi.com/2/users/get_current_account` | `account_info.read` | status, diagnostics | session | — |
+| List folder | `POST https://api.dropboxapi.com/2/files/list_folder` | `files.metadata.read` | `BrowseService` | folder cache | `limit` is `UInt32(1–2000)` and **approximate** — more entries may return; root is `""`; never set `recursive` |
+| Continue listing | `POST https://api.dropboxapi.com/2/files/list_folder/continue` | `files.metadata.read` | `BrowseService` | folder cache | `reset` error invalidates the cursor → restart from `list_folder`; identical simultaneous calls are rate-limited by design |
+| Metadata | `POST https://api.dropboxapi.com/2/files/get_metadata` | `files.metadata.read` | deletion checks | folder cache | **"Metadata for the root folder is unsupported"** — root existence is proved with `list_folder` instead |
+| Thumbnails | `POST https://content.dropboxapi.com/2/files/get_thumbnail_batch` | `files.content.read` | `PreviewService` | thumbnail cache | **content host**, not `api`; max **25** entries per batch; sources limited to jpg/jpeg/png/tiff/tif/gif/webp/ppm/bmp; files over 20 MB are not converted; `thumbnail` returns **base64 in JSON** |
+| List existing links | `POST https://api.dropboxapi.com/2/sharing/list_shared_links` | `sharing.read` | `SharedLinkResolver` | link cache | `direct_only: true` suppresses parent-folder links; a `cursor` is returned **only when no path is given**, so the path-scoped call is single-shot |
+| Create link | `POST https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings` | `sharing.write` | `SharedLinkResolver` | link cache | **`settings` is deliberately omitted** so that `shared_link_already_exists` carries the existing link metadata; default visibility is public |
+
+`files/get_temporary_link` was removed from this matrix. Its documentation states the link
+"will expire in four hours and afterwards you will get 410 Gone" and that the "URL should not be
+used to display content directly in the browser" — so it is unusable both for persistence and for
+preview (RE-013). The deprecated `sharing/get_shared_links` route, retiring in October 2026, is
+never called.
 
 **Requested scopes**: `account_info.read`, `files.metadata.read`, `files.content.read`,
 `sharing.read`, `sharing.write`. `sharing.write` is the only write-capable scope and is needed
 solely to create a link when none exists; the connect dialog says so. `files.content.write` and
-all team scopes are never requested.
+all team scopes are never requested. The authorize URL always sends an explicit `scope`, because
+the reference states that omitting it requests every scope enabled on the app's Permissions tab —
+so an explicit list protects GMs whose own app is broader than Droplet needs.
 
 **Content access**: App Folder by default — Dropbox scopes the app to `/Apps/<AppName>` and
 paths are already relative to it. Full Dropbox only by explicit GM opt-in, with a warning.
 
-**Rate limits**: HTTP 429 carries `Retry-After`, and `…too_many_requests` error bodies carry
-`error.retry_after` in seconds. `DropboxHttpClient` parses both, honors the larger value, retries
-at most three times with jitter, surfaces a `RateLimited` error carrying the wait duration, and
-never retries link creation more than once.
+**Rate limits**: HTTP 429 carries a `Retry-After` header, and a JSON `RateLimitError` body carries
+`reason` (`too_many_requests` or `too_many_write_operations`) and `retry_after` in seconds. The
+response may be plain text rather than JSON, so the header is the primary source and the body is
+a refinement. `DropboxHttpClient` parses both, honors the larger value, retries at most three
+times with jitter, surfaces a `RateLimited` error carrying the wait duration, and never retries
+link creation more than once. Because the reference warns that simultaneous identical
+`list_folder` calls are themselves a rate-limit trigger, listing is additionally single-flighted
+by path and cursor, and no retry is issued while an identical request is still outstanding.
+
+**Authorization failures**: a 401 carries an `AuthError` tag. `expired_access_token` triggers
+exactly one silent refresh attempt; `invalid_access_token`, `user_suspended`, and
+`route_access_denied` do not, because refreshing against a revoked or malformed grant would loop.
+These map to distinct `DropletError` values with distinct recovery text.
 
 ## Data Flow: OAuth (code-display mode, default)
 
@@ -445,9 +502,11 @@ sequenceDiagram
             DX-->>R: link
         else none
             R->>DX: sharing/create_shared_link_with_settings(path)
-            alt shared_link_already_exists
-                DX-->>R: error carrying existing metadata
-                R->>DX: sharing/list_shared_links(path)
+            alt already exists, metadata included
+                DX-->>R: error carrying existing link metadata
+                R->>R: adopt directly, no second call
+            else already exists, no metadata
+                R->>DX: sharing/list_shared_links(path, direct_only)
                 DX-->>R: link (adopted)
             else created
                 DX-->>R: new link
@@ -469,6 +528,8 @@ sequenceDiagram
 - Dropbox paths are normalized to a leading `/`, no trailing `/` (the root is `""` in API calls),
   no `.` or `..` segments, no duplicate separators, Unicode NFC.
 - The **effective root** is `""` in App Folder mode or the configured folder in Full Dropbox mode.
+- Root existence is verified with a `list_folder` call, **not** `get_metadata`, because the
+  reference states that "Metadata for the root folder is unsupported".
 - `resolveWithin(root, candidate)` returns a path or throws `RootPolicyViolation`. Comparison is
   case-folded because Dropbox paths are case-insensitive but case-preserving; display always uses
   the casing Dropbox returned.
@@ -526,7 +587,7 @@ Full contract: [contracts/error-model.md](contracts/error-model.md).
 | T11 | Compromised GM browser | Outside the module's control | **Accepted.** Documented in SECURITY.md; response is disconnect plus Dropbox-side revocation. |
 | T12 | Untrusted remote SVG | Off by default (ADR-007), warning on enable | **Accepted when enabled.** |
 | T13 | Tracking and IP disclosure to Dropbox | Player browsers contact Dropbox directly, exposing their IPs; disclosed in README and settings copy | **Accepted, inherent to the feature.** |
-| T14 | Denial of service via huge folders or thumbnail storms | Page-size cap, LRU bounds, thumbnail concurrency cap, abort on navigation, bounded retries | Low |
+| T14 | Denial of service via huge folders or thumbnail storms | Page-size cap, LRU bounds, thumbnail batch and in-flight caps, single-flight listing, abort on navigation, bounded retries | Low |
 
 ## Shared-Link Security Assessment
 
@@ -535,7 +596,10 @@ Full contract: [contracts/error-model.md](contracts/error-model.md).
   paid-plan features that cannot be relied on.
 - Every asset a GM selects becomes readable by anyone who obtains its URL, including all players
   in the world, because the URL is stored in a document players load.
-- Droplet never revokes links; the GM revokes from Dropbox, and the README documents how.
+- Droplet never revokes links; the GM revokes from Dropbox, and the README documents how. The
+  README must also state the documented caveat that revoking a file's link does **not** remove
+  access if a shared link to a parent folder still exists — otherwise a GM will believe an asset
+  is private when it is not.
 - Diagnostics and logs redact full shared URLs, reporting only a file name and a truncated id.
 - The first-selection warning is acknowledged once per world and remains visible in settings.
 
@@ -550,7 +614,8 @@ reuse; `shared_link_already_exists` adoption; concurrent-resolve deduplication; 
 charset and length plus S256 challenge vectors; `state` generation and validation; token-expiry
 math and the refresh skew window; single-flight refresh under concurrent callers; redaction of
 tokens, codes, verifiers, and full shared URLs; Dropbox-error-to-`DropletError` mapping for every
-documented shape; `Retry-After` and `error.retry_after` scheduling with bounded attempts; settings
+documented shape; `Retry-After` header and `RateLimitError.retry_after` body scheduling with
+bounded attempts; settings
 validation; Foundry-version-to-adapter selection.
 
 **Integration (Vitest with jsdom, plus Playwright; mocked `fetch` and mocked Foundry global)**:
@@ -632,7 +697,11 @@ Method and acceptance criteria for each spike: [research.md](research.md).
 | RS-07 | What are the v13 equivalents of the v14 hooks and classes used, and does `renderSceneConfig` deliver an element or jQuery on v13? | no | Phase 2, v13 claim |
 | RS-08 | Is configuring `CONFIG.ux.FilePicker` with a subclass a viable future path to a native Dropbox tab? | no (future) | post-release |
 | RS-09 | Which of AVIF, FLAC, M4A, and WebM decode reliably across target browsers and Foundry's own media handling? | no | classification honesty |
-| RS-10 | What are `get_thumbnail_batch`'s limits, sizes, supported source formats, and cost per call? | no | Phase 5 |
+| RS-10 | ~~Thumbnail and listing limits~~ — **closed** against the HTTP reference: 25 per batch, 20 MB source cap, `limit` max 2000 and approximate | no | Phase 5 |
+| RS-10a | Can `has_more` be true with an empty `entries` array? | no | Phase 4 |
+| RS-11 | ~~Re-verify endpoint paths, bodies, and errors~~ — **closed**; the reference was read in full and fixtures may now be authored from it | no | Phase 4 |
+| RS-12 | ~~Does the already-exists error carry the existing link?~~ — **closed**: yes, provided no custom `settings` are sent (ADR-011) | no | Phase 6 |
+| RS-13 | Do CORS pre-flight `OPTIONS` requests to the Dropbox API hosts succeed from a Foundry world origin? | no | Phase 6, ADR-010 |
 
 ## Distribution and CI
 
@@ -661,7 +730,7 @@ Method and acceptance criteria for each spike: [research.md](research.md).
 | R-03 | A Foundry v14 patch changes `SceneConfig` markup | The button stops appearing | The field is located by `name` attribute, not DOM shape; silent no-op plus a diagnostic entry; an integration test against a snapshot fixture |
 | R-04 | Another module reads the refresh token | Dropbox exposure limited to granted scopes | Minimal scopes, App Folder default, documented residual risk, disconnect plus Dropbox-side revocation guidance |
 | R-05 | GMs are confused that the connection is per-browser | Support burden | Explicit settings copy and a README section; the connection status names browser-local storage |
-| R-06 | Rate limiting while browsing large folders | Poor experience | Cache-first, one request per page, thumbnail concurrency cap, `Retry-After` respected, throttle state shown |
+| R-06 | Rate limiting while browsing large folders | Poor experience | Cache-first, one request per page, thumbnail batch cap of 25, single-flight listing per path and cursor, `Retry-After` respected, throttle state shown |
 | R-07 | Dropbox app-review requirements beyond the development-user cap | The GM's own app may need review | The README documents Dropbox's development and production app states; each GM owns their app |
 | R-08 | FR-006 assumes a `state` round trip that code-display mode does not have | Requirement/implementation mismatch | Raise as a spec clarification (ADR-002); implement `state` fully in redirect mode and verifier binding in code-display mode |
 | R-09 | `fvtt-types` lags behind v14 | Type friction | Keep an internal minimal ambient declaration file as a fallback; do not block on third-party types |
@@ -688,8 +757,10 @@ Release 1 is done when all of the following hold:
    unauthorized, rate-limited, offline, and module-disabled states.
 10. `module.json` declares only verified compatibility, and anything unverified is labeled as such
     in the README.
-11. README, CONTRIBUTING, SECURITY, ADR-001 to ADR-009, the threat model, and the compatibility
-    matrix are published and match implemented behavior.
+11. README, CONTRIBUTING, SECURITY, ADR-001 to ADR-011, the threat model, and the compatibility
+    matrix are published and match implemented behavior. The README states how to revoke a shared
+    link in Dropbox **and** that revocation does not remove access while a link to a parent folder
+    still exists.
 12. Every merged pull request references the spec requirement or task it implements.
 
 ## Project Structure

@@ -1,0 +1,12 @@
+src/
+tests/
+specs/
+docs/
+.github/
+.specify/
+.vscode/
+coverage/
+playwright-report/
+test-results/
+*.config.*
+tsconfig.json

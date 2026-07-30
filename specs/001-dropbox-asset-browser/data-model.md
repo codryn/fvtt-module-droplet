@@ -71,7 +71,7 @@ Persistence: **world setting** (`droplet.root`).
 |---|---|---|
 | `path` | `string` | Normalized; `""` in App Folder mode |
 | `displayPath` | `string` | Dropbox-cased path for the UI |
-| `verifiedAt` | `number \| null` | Last time `get_metadata` confirmed it exists |
+| `verifiedAt` | `number \| null` | Last time a `list_folder` call confirmed it exists — `get_metadata` cannot be used, because Dropbox documents that "Metadata for the root folder is unsupported" |
 
 **Validation**: normalized per the root-path policy; must resolve to an existing folder, otherwise
 `RootFolderMissing`. In App Folder mode the value is forced to `""` and is not editable.
@@ -146,8 +146,9 @@ memory.
 **Validation**: `url` must be `https:`, must have host `www.dropbox.com`, must carry `raw=1`, and
 must not carry any `dl` parameter. A value that fails is discarded, not repaired.
 
-**Invariants**: never holds a `files/get_temporary_link` result; bounded to 500 entries with LRU
-eviction; a schema-version mismatch discards the whole store.
+**Invariants**: never holds a `files/get_temporary_link` result — that endpoint is not used at all
+(RE-013); bounded to 500 entries with LRU eviction; a schema-version mismatch discards the whole
+store.
 
 ---
 
@@ -160,6 +161,12 @@ Persistence: **memory** only.
 | `key` | `string` | `fileId` + `rev` + size |
 | `objectUrl` | `string` | From `URL.createObjectURL` |
 | `createdAt` | `number` | |
+| `byteLength` | `number` | Decoded size, used for the cache bound |
+
+**Source shape**: `get_thumbnail_batch` returns each thumbnail as a **base64 string inside the
+JSON body**, so `PreviewService` decodes to a `Blob` before creating the object URL. The
+base64 form is roughly a third larger than the decoded bytes and is discarded immediately; only
+decoded sizes count toward the cache bound.
 
 **Invariants**: eviction, application close, and `beforeunload` each call `URL.revokeObjectURL`.
 Binary data is never written to `localStorage`.
@@ -218,11 +225,12 @@ Persistence: **world setting** unless marked otherwise.
 | `accessMode` | `"appFolder" \| "fullDropbox"` | `appFolder` | world | Full Dropbox shows a warning |
 | `rootPath` | `string` | `""` | world | Ignored in App Folder mode |
 | `allowSvg` | `boolean` | `false` | world | Enabling shows a security warning |
-| `offlineAccess` | `boolean` | `false` | world | Opt-in refresh tokens; shows the storage warning |
+| `offlineAccess` | `boolean` | `false` | world | Opt-in refresh tokens; shows the storage warning. When enabled, the token request sends `refresh_token_expiration_seconds` so the grant expires after 30 days rather than living indefinitely |
 | `browsePermissionRole` | `number` | GM | world | Role threshold for opening the browser |
 | `folderCacheTtlSeconds` | `number` | `300` | world | 0–3600 |
-| `pageSize` | `number` | `200` | world | 25–500 |
-| `thumbnailConcurrency` | `number` | `6` | world | 1–12 |
+| `pageSize` | `number` | `200` | world | 25–500; Dropbox caps `limit` at 2000 and treats it as approximate, so the renderer tolerates a longer page than requested |
+| `thumbnailBatchSize` | `number` | `25` | world | 1–25; 25 is Dropbox's documented hard ceiling for `get_thumbnail_batch` |
+| `thumbnailBatchesInFlight` | `number` | `2` | world | 1–4 |
 | `showSharedLinkWarning` | `boolean` | `true` | world | Cleared once acknowledged |
 | `connection` | `DropletConnectionState \| null` | `null` | **client** | Never world scope |
 | `lastBrowsedPath` | `string` | `""` | **client** | Convenience only |
