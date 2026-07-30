@@ -19,11 +19,11 @@ integration for the first release is strictly additive: a "Browse Dropbox" contr
 the public `renderSceneConfig` hook next to the Scene background field, leaving the native
 FilePicker untouched.
 
-Four questions are treated as blockers and are resolved or scheduled as spikes before
-implementation: OAuth redirect on Forge (**resolved**, ADR-002), token storage location
+Four questions are treated as planning gates and are resolved or scheduled as spikes before
+release sign-off: OAuth redirect on Forge (**resolved**, ADR-002), token storage location
 (**resolved pending empirical confirmation**, ADR-003 + RS-02), persisted URL form (**resolved
 pending live confirmation**, ADR-005 + RS-04), and CSP/CORS behavior for Dropbox content under
-The Forge (**unresolved blocker**, RS-06).
+The Forge (**unresolved release gate**, RS-06).
 
 ## Technical Context
 
@@ -75,7 +75,7 @@ designed for additional surfaces.
 | Stable reference | PASS | ADR-005 fixes the persisted URL form; `files/get_temporary_link` is not used at all — Dropbox documents that its links expire in four hours and "should not be used to display content directly in the browser" (RE-013); reuse and deduplication logic is specified with tests. |
 | Foundry compatibility | PASS with conditions | v14 surfaces are named from the 14.365 public API (`foundry.applications.apps.FilePicker`, `renderSceneConfig` as an instance of the documented generic `renderApplicationV2` hook, `CONFIG.ux`); v13 differences are isolated behind `FoundryAdapter`. Condition: RS-07 must confirm v13 hook and class names on a real v13 install before any v13 compatibility claim ships. |
 | Architecture | PASS | Component boundaries below map one-to-one onto the constitution's required component list, with enforced dependency direction. |
-| Test and evidence | CONDITIONAL | RS-06 (Forge CSP/CORS) is an unresolved blocker; RS-04 (shared-link form) and RS-05 (media validation under CORS) need live confirmation. Phase 0 schedules all three as spikes ahead of phases 6 and 7. |
+| Test and evidence | CONDITIONAL | RS-06 (Forge CSP/CORS) is an unresolved release gate for Forge compatibility claims; RS-04 (shared-link form) and RS-05 (media validation under CORS) need live confirmation. Phase 0 schedules all three as evidence work ahead of release sign-off. |
 | Documentation and release | PASS | Required documents are enumerated in the Definition of Done; their production is phase-10 work but their scope is fixed here. |
 
 ### Post-Phase 1 re-evaluation
@@ -86,7 +86,7 @@ designed for additional surfaces.
 | Stable reference | PASS | `SharedLinkMapping` stores only canonical `raw=1` URLs; the `resolveAssetUrl` contract forbids returning a temporary link, and RE-013 removed `files/get_temporary_link` from the design entirely. |
 | Foundry compatibility | PASS | The `FoundryAdapter` contract is version-agnostic; two implementations are selected at `init`; an unsupported version yields `UnsupportedVersionAdapter`, which disables integration after one notification. |
 | Architecture | PASS | No UI component imports the Dropbox transport; no Dropbox service imports Foundry globals; dependency direction is UI → services → adapters. |
-| Test and evidence | CONDITIONAL (unchanged) | RS-06 remains a blocker for phase 6/7 sign-off. Phases 1–5 are unblocked and do not depend on it. |
+| Test and evidence | CONDITIONAL (unchanged) | RS-06 remains a release gate for Forge sign-off. Implementation phases do not depend on it, but release documentation and compatibility claims do. |
 | Documentation and release | PASS | Phase 1 introduced one new documentation obligation, already folded into the Definition of Done: the README must state that revoking a file's shared link does not remove access while a parent-folder link exists. |
 
 **Effect of the Phase 0 documentation review**: reading the Dropbox HTTP API v2 reference in full
@@ -674,13 +674,13 @@ Until a cell is verified on the actual target, the README labels it **unverified
 | 3 | OAuth proof of concept | Connect, refresh, and disconnect work end to end in code-display mode; PKCE, state, refresh, and redaction unit tests green; RS-01 to RS-03 recorded | RS-03 |
 | 4 | Listing and pagination | A 1,000-entry fixture pages correctly; root policy enforced; zero link calls during listing | — |
 | 5 | Browser UI and filters | Breadcrumbs, list and grid modes, filters, lazy thumbnails, cancellation, empty/error/loading states, keyboard navigation | — |
-| 6 | Shared-link resolution | Reuse, deduplication, already-exists adoption, normalization, validation; RS-04 and RS-05 recorded | **RS-04, RS-05, RS-06** |
-| 7 | Scene background integration | Selection writes the URL plus both events; cancel leaves the value; a missing field is a silent no-op | **RS-06** |
+| 6 | Shared-link resolution | Reuse, deduplication, already-exists adoption, normalization, validation; RS-04 and RS-05 recorded | **RS-04, RS-05** |
+| 7 | Scene background integration | Selection writes the URL plus both events; cancel leaves the value; a missing field is a silent no-op | — |
 | 8 | Cache, diagnostics, hardening | All three caches; a redacted diagnostic report with copy-to-clipboard; clear-caches action; threat-model mitigations implemented | — |
 | 9 | Automated and compatibility testing | Unit and integration suites green; the manual matrix filled with real results | RS-06, RS-07 |
 | 10 | Packaging, documentation, release workflow | The release ZIP contains runtime files only; README, CONTRIBUTING, SECURITY, and ADRs complete; a tagged release workflow produces manifest and download URLs | — |
 
-Phases 1–5 are unblocked today. Phases 6 and 7 must not be declared complete while RS-06 is open.
+Implementation is unblocked today. RS-06 must be resolved before Forge compatibility is claimed in release artifacts or documentation.
 
 ## Research Spikes
 
@@ -693,7 +693,7 @@ Method and acceptance criteria for each spike: [research.md](research.md).
 | RS-03 | Does Dropbox issue a refresh token for a PKCE app with `token_access_type=offline` and no secret, and refresh without a secret? | yes | Phase 3 |
 | RS-04 | What are the current shared-link forms, and what normalization yields direct content? | yes (checkpoint 6) | Phase 6 |
 | RS-05 | Do `raw=1` URLs load cross-origin in `<img>`, `<audio>`, and `<video>`, and can validation avoid CORS? | yes (checkpoint 9) | Phase 6 |
-| RS-06 | Does The Forge's CSP permit the Dropbox API and content hosts for `connect-src`, `img-src`, and `media-src`, and what is the failure mode? | **yes, unresolved** (checkpoint 9) | Phases 6 and 7 |
+| RS-06 | Does The Forge's CSP permit the Dropbox API and content hosts for `connect-src`, `img-src`, and `media-src`, and what is the failure mode? | **yes, unresolved** (checkpoint 9) | Forge release sign-off, compatibility matrix |
 | RS-07 | What are the v13 equivalents of the v14 hooks and classes used, and does `renderSceneConfig` deliver an element or jQuery on v13? | no | Phase 2, v13 claim |
 | RS-08 | Is configuring `CONFIG.ux.FilePicker` with a subclass a viable future path to a native Dropbox tab? | no (future) | post-release |
 | RS-09 | Which of AVIF, FLAC, M4A, and WebM decode reliably across target browsers and Foundry's own media handling? | no | classification honesty |
@@ -725,7 +725,7 @@ Method and acceptance criteria for each spike: [research.md](research.md).
 
 | ID | Risk | Impact | Mitigation |
 |---|---|---|---|
-| R-01 | The Forge's CSP blocks Dropbox hosts | The feature is unusable on the primary target | RS-06 before phases 6 and 7; if blocked, document it honestly and either narrow supported hosting or raise a request with The Forge — **not** introduce a proxy |
+| R-01 | The Forge's CSP blocks Dropbox hosts | The feature is unusable on the primary target | RS-06 before any Forge compatibility claim ships; if blocked, document it honestly and either narrow supported hosting or raise a request with The Forge — **not** introduce a proxy |
 | R-02 | Dropbox changes shared-link semantics | Persisted document values break | Normalization isolated in `domain/sharedLinkUrl.ts` with fixture tests; a documented re-validation procedure; existing links keep working through Dropbox redirects |
 | R-03 | A Foundry v14 patch changes `SceneConfig` markup | The button stops appearing | The field is located by `name` attribute, not DOM shape; silent no-op plus a diagnostic entry; an integration test against a snapshot fixture |
 | R-04 | Another module reads the refresh token | Dropbox exposure limited to granted scopes | Minimal scopes, App Folder default, documented residual risk, disconnect plus Dropbox-side revocation guidance |

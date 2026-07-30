@@ -22,7 +22,8 @@ Sources consulted:
 Sources attempted and unavailable at planning time:
 
 - The Forge blog and community forum pages on external asset links returned HTTP 404. **No Forge
-  CSP evidence was obtained.** This is recorded as blocking spike RS-06 and must not be guessed.
+  CSP evidence was obtained.** This is recorded as release-gating spike RS-06 and must not be
+  guessed.
 - `dropbox.com/developers/reference/error-handling` returned HTTP 404. The error facts used here
   come from the "Errors" and "Errors by status code" sections of the HTTP reference itself, which
   were read successfully.
@@ -227,17 +228,18 @@ error appears in the console. Record the results including the redirect chain.
 
 ---
 
-## RE-006 / Checkpoint 9 (part 2) — The Forge's Content Security Policy — **UNRESOLVED BLOCKER**
+## RE-006 / Checkpoint 9 (part 2) — The Forge's Content Security Policy — **UNRESOLVED RELEASE GATE**
 
 **Status**: **Open. No evidence obtained.** The Forge documentation pages attempted during
 planning returned HTTP 404. No claim about Forge's CSP appears anywhere in this plan.
 
-**Why it blocks**: if The Forge sends a CSP that restricts `connect-src`, `img-src`, or
+**Why it gates release**: if The Forge sends a CSP that restricts `connect-src`, `img-src`, or
 `media-src`, then either the Dropbox API calls, the asset rendering, or both fail on the primary
 deployment target. No amount of client-side design can work around a CSP, and introducing a proxy
-to do so is forbidden by ADR-001.
+to do so is forbidden by ADR-001. The implementation can proceed against the self-hosted and
+fixture-backed paths, but no Forge compatibility claim may ship until this evidence is recorded.
 
-**Open spike RS-06** (blocks phases 6 and 7):
+**Open spike RS-06** (required before Forge sign-off and release):
 
 1. Load a Forge-hosted world and read the response headers of the world page and the
    `Content-Security-Policy` meta tag, if any.
@@ -509,11 +511,11 @@ on a key the project cannot rotate per user); a backend that owns the app (viola
 | 6 | Which URL form is persisted | **Answered** — canonical shared link with `raw=1`, `rlkey` preserved; RS-04 confirms live |
 | 7 | How existing links are detected and reused | **Answered** — cache, list, create without `settings`, adopt the conflict's inline metadata, re-list only when it is absent, single-flight |
 | 8 | Privacy properties of those links | **Answered** — capability URLs; warned, redacted, revoked in Dropbox |
-| 9 | Can assets load under Forge and browser CSP/CORS | **UNRESOLVED — RS-06 blocks phases 6 and 7** |
+| 9 | Can assets load under Forge and browser CSP/CORS | **UNRESOLVED — RS-06 blocks Forge sign-off and release claims, not implementation** |
 | 10 | How this is tested against a real Forge world | **Answered** — dedicated Forge world, throwaway Dropbox account, scripted checklist |
 
-No `NEEDS CLARIFICATION` marker remains in the Technical Context. One blocker (RS-06) and a set of
-confirmation spikes remain, each with a written procedure and acceptance criterion.
+No `NEEDS CLARIFICATION` marker remains in the Technical Context. One release gate (RS-06) and a
+set of confirmation spikes remain, each with a written procedure and acceptance criterion.
 
 ### Spike status after the HTTP-reference review
 
@@ -523,7 +525,7 @@ confirmation spikes remain, each with a written procedure and acceptance criteri
 | RS-11 (re-verify endpoints before writing fixtures) | **Closed** — the reference was read in full; hosts, scopes, arguments, and error unions are recorded above and fixtures may now be authored from them |
 | RS-12 (already-exists payload) | **Closed** — the error carries the existing link metadata **provided no custom `settings` were sent**, which is why Droplet now omits `settings` |
 | RS-13 (CORS pre-flight behavior) | **New, non-blocking** — folds into RS-06's evidence file |
-| RS-06 (Forge CSP) | **Still open and still blocking.** Two further source attempts during this review returned HTTP 404 and an unreadable page. No Forge CSP claim exists anywhere in this plan |
+| RS-06 (Forge CSP) | **Still open and still release-gating.** Two further source attempts during this review returned HTTP 404 and an unreadable page. No Forge CSP claim exists anywhere in this plan |
 
 The review also produced four corrections rather than confirmations, which is the reason it was
 worth doing: the PKCE token request sends `client_id` **and** `code_verifier`;

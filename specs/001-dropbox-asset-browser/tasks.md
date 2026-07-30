@@ -236,6 +236,7 @@
 - [ ] T088 Finalize manifest compatibility, version consistency, and release artifact assertions in static/module.json, package.json, and .github/workflows/release.yml
 - [ ] T089 Run the quickstart validation and record the browser and host compatibility matrix in docs/research/compatibility.md
 - [ ] T090 Resolve or explicitly withdraw the RS-06 Forge CSP claim and update specs/001-dropbox-asset-browser/research.md and specs/001-dropbox-asset-browser/plan.md to match the evidence
+- [ ] T091 Run the RS-06 Forge manual compatibility test against the built module on an actual Forge world, record the CSP directives and probe outcomes in docs/research/forge-csp.md, then update docs/research/compatibility.md, README.md, and static/module.json to either keep or withdraw the Forge compatibility claim before release
 
 ---
 
@@ -334,5 +335,5 @@ RS-06 is either resolved with evidence or the Forge compatibility claim is expli
 | 7 | US5 Load (P2) | T063–T071 | 9 |
 | 8 | US6 Failures (P3) | T072–T078 | 7 |
 | 9 | US7 Transparency (P3) | T079–T084 | 6 |
-| 10 | Polish | T085–T090 | 6 |
-| | **Total** | | **90** |
+| 10 | Polish | T085–T091 | 7 |
+| | **Total** | | **91** |
