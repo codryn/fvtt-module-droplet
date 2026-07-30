@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "module": "dist/module.js",
+  "files": ["dist"],
   "scripts": {
     "build": "vite build",
     "typecheck": "tsc --noEmit",
@@ -31,5 +33,6 @@
   },
   "engines": {
     "node": ">=20.19"
-  }
+  },
+  "packageManager": "npm@10"
 }
