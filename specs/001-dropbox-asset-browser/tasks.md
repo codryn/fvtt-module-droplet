@@ -56,19 +56,19 @@
 
 ### Tests for User Story 1
 
-- [ ] T019 [P] [US1] Add PKCE unit tests covering the verifier charset, the 43–128 length bound, and S256 challenge derivation in tests/unit/auth/Pkce.test.ts
-- [ ] T020 [P] [US1] Add token-request contract tests asserting the PKCE exchange sends **both** `client_id` and `code_verifier` with no secret, and that refresh sends `grant_type=refresh_token` with `client_id`, in tests/unit/auth/tokenRequest.test.ts
-- [ ] T021 [P] [US1] Add an authorize-URL test asserting the explicit five-scope list, `code_challenge_method=S256`, and the absence of `redirect_uri` in code-display mode in tests/unit/auth/authorizeUrl.test.ts
-- [ ] T022 [P] [US1] Add tests asserting no world-scoped setting holds authentication state and that concurrent refreshes are serialized behind one in-flight promise in tests/unit/auth/CredentialStore.test.ts and tests/unit/auth/refreshSerialization.test.ts
+- [X] T019 [P] [US1] Add PKCE unit tests covering the verifier charset, the 43–128 length bound, and S256 challenge derivation in tests/unit/auth/Pkce.test.ts
+- [X] T020 [P] [US1] Add token-request contract tests asserting the PKCE exchange sends **both** `client_id` and `code_verifier` with no secret, and that refresh sends `grant_type=refresh_token` with `client_id`, in tests/unit/auth/tokenRequest.test.ts
+- [X] T021 [P] [US1] Add an authorize-URL test asserting the explicit five-scope list, `code_challenge_method=S256`, and the absence of `redirect_uri` in code-display mode in tests/unit/auth/authorizeUrl.test.ts
+- [X] T022 [P] [US1] Add tests asserting no world-scoped setting holds authentication state and that concurrent refreshes are serialized behind one in-flight promise in tests/unit/auth/CredentialStore.test.ts and tests/unit/auth/refreshSerialization.test.ts
 - [ ] T023 [P] [US1] Add integration coverage for GM-only connect, code paste, state-mismatch rejection, reconnect, and disconnect in tests/integration/settings/dropboxConnection.test.ts
-- [ ] T024 [US1] Record the RS-01, RS-02, and RS-03 spike outcomes in docs/research/oauth-code-display.md, docs/research/token-storage-scope.md, and docs/research/refresh-token-pkce.md
+- [X] T024 [US1] Record the RS-01, RS-02, and RS-03 spike outcomes in docs/research/oauth-code-display.md, docs/research/token-storage-scope.md, and docs/research/refresh-token-pkce.md
 
 ### Implementation for User Story 1
 
-- [ ] T025 [P] [US1] Implement PKCE verifier, challenge, and state generation using crypto.getRandomValues in src/auth/Pkce.ts
-- [ ] T026 [P] [US1] Implement client-scope credential persistence with explicit expiry handling in src/auth/CredentialStore.ts
-- [ ] T027 [US1] Implement authorize-URL construction with an always-explicit scope list and the opt-in redirect mode in src/auth/authorizeUrl.ts
-- [ ] T028 [US1] Implement connect, completeConnect, serialized refresh, the `expired_access_token` versus `invalid_access_token` split, `refresh_token_expiration_seconds` for opt-in offline access, and disconnect in src/auth/DropboxOAuthService.ts
+- [X] T025 [P] [US1] Implement PKCE verifier, challenge, and state generation using crypto.getRandomValues in src/auth/Pkce.ts
+- [X] T026 [P] [US1] Implement client-scope credential persistence with explicit expiry handling in src/auth/CredentialStore.ts
+- [X] T027 [US1] Implement authorize-URL construction with an always-explicit scope list and the opt-in redirect mode in src/auth/authorizeUrl.ts
+- [X] T028 [US1] Implement connect, completeConnect, serialized refresh, the `expired_access_token` versus `invalid_access_token` split, `refresh_token_expiration_seconds` for opt-in offline access, and disconnect in src/auth/DropboxOAuthService.ts
 - [ ] T029 [US1] Build the connection settings UI, GM gating, and status and warning copy in src/settings/DropletSettingsApplication.ts, src/templates/droplet-settings.hbs, and static/lang/en.json
 
 **Checkpoint**: A GM authorizes Dropbox, sees status and the exposed root, and disconnects cleanly.

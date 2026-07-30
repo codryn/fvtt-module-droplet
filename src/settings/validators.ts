@@ -60,7 +60,7 @@ function validateConnectionState(value: unknown): DropletConnectionState | null 
     typeof candidate.accessToken !== "string" ||
     candidate.accessToken.length === 0 ||
     typeof candidate.expiresAt !== "number" ||
-    candidate.expiresAt <= Date.now() ||
+    !Number.isFinite(candidate.expiresAt) ||
     typeof candidate.connectedAt !== "number" ||
     typeof candidate.appKey !== "string" ||
     candidate.appKey.length === 0

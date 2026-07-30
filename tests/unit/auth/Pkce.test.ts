@@ -5,7 +5,8 @@ import { PKCE_CONSTRAINTS, challengeFor, createState, createVerifier } from "@/a
 describe("Pkce", () => {
   it("generates verifiers within the documented charset and bounds", () => {
     const verifier = createVerifier();
-    const allowedPattern = new RegExp(`^[${PKCE_CONSTRAINTS.allowedCharacters.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}]+$`, "u");
+    const allowedCharacters = PKCE_CONSTRAINTS.allowedCharacters.replace(/[-\\\]]/gu, "\\$&");
+    const allowedPattern = new RegExp(`^[${allowedCharacters}]+$`, "u");
 
     expect(verifier).toHaveLength(PKCE_CONSTRAINTS.defaultVerifierLength);
     expect(verifier.length).toBeGreaterThanOrEqual(PKCE_CONSTRAINTS.minLength);
