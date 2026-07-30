@@ -36,12 +36,12 @@
 - [X] T009 [P] Implement the v14 and v13 adapter shells in src/foundry/v14/FoundryV14Adapter.ts and src/foundry/v13/FoundryV13Adapter.ts
 - [X] T010 [P] Register and validate every settings key from data-model.md, including thumbnailBatchSize and thumbnailBatchesInFlight, in src/settings/registerSettings.ts and src/settings/validators.ts
 - [X] T011 [P] Define the DropboxClient interface and the explicit endpoint host table separating api.dropboxapi.com from content.dropboxapi.com in src/dropbox/DropboxClient.ts and src/dropbox/endpoints.ts
-- [ ] T012 [P] Implement the DropletError hierarchy and the Dropbox status-and-tag mapping from contracts/error-model.md in src/dropbox/errors.ts and src/types/errors.ts
+- [X] T012 [P] Implement the DropletError hierarchy and the Dropbox status-and-tag mapping from contracts/error-model.md in src/dropbox/errors.ts and src/types/errors.ts
 - [X] T013 [P] Implement retry scheduling that honors the `Retry-After` header and the `RateLimitError.retry_after` body field, taking the larger, with bounded attempts in src/dropbox/rateLimit.ts
 - [X] T014 Implement the transport core — POST, `Authorization: Bearer` header, JSON body, abort support, host routing, and no token in any URL per ADR-010 — in src/dropbox/DropboxHttpClient.ts
 - [X] T015 [P] Implement localization helpers and baseline strings in src/localization/t.ts and static/lang/en.json
 - [X] T016 [P] Implement redaction, logging, and diagnostics foundations in src/diagnostics/Redactor.ts, src/diagnostics/Logger.ts, and src/diagnostics/DiagnosticsService.ts
-- [ ] T017 [P] Author Dropbox request and response fixtures from contracts/dropbox-client.md, pinning hosts and error unions, in tests/fixtures/dropbox/
+- [X] T017 [P] Author Dropbox request and response fixtures from contracts/dropbox-client.md, pinning hosts and error unions, in tests/fixtures/dropbox/
 - [X] T018 Wire bootstrap — adapter selection, settings registration, hook registration, diagnostics startup — in src/module.ts
 
 **Checkpoint**: The module loads, selects an adapter, registers settings, and exposes the shared seams. No Dropbox request is issued during `init` or `ready`.

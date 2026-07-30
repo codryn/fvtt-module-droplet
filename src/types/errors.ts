@@ -47,6 +47,7 @@ export interface DropletErrorShape {
 export interface DropletErrorOptions {
   readonly cause?: unknown;
   readonly detail?: string;
+  readonly i18nKey?: string;
   readonly message?: string;
   readonly recovery?: RecoveryAction;
   readonly retryAfterMs?: number | null;

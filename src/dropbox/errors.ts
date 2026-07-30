@@ -45,15 +45,25 @@ export class DropletError extends Error implements DropletErrorShape {
     public readonly code: DropletErrorCode,
     options: DropletErrorOptions = {},
   ) {
-    super(options.message ?? `DROPLET.errors.${code}.message`);
+    const i18nKey = options.i18nKey ?? `DROPLET.errors.${code}.message`;
+
+    super(options.message ?? i18nKey);
     this.name = "DropletError";
-    this.i18nKey = `DROPLET.errors.${code}.message`;
+    this.i18nKey = i18nKey;
     this.recovery = options.recovery ?? DEFAULT_RECOVERY[code];
     this.technicalDetail = redactValue(options.detail ?? options.cause ?? this.message);
     this.retryAfterMs = options.retryAfterMs ?? null;
     this.cause = options.cause;
   }
 }
+
+const SHARED_LINK_CREATION_TAGS = new Set([
+  "email_not_verified",
+  "settings_error",
+  "access_denied",
+  "banned_member",
+  "too_many_shared_folders",
+]);
 
 export function createDropletError(code: DropletErrorCode, options: DropletErrorOptions = {}): DropletError {
   return new DropletError(code, options);
@@ -73,6 +83,10 @@ export function mapDropboxError(context: DropboxErrorContext): DropletError {
 
   if (status === 403 && errorTag === "invalid_client") {
     return createDropletError("InvalidAppKey", { detail, cause });
+  }
+
+  if (status === 403 && errorTag === "access_denied") {
+    return createDropletError("AuthorizationDenied", { detail, cause });
   }
 
   if (status === 403) {
@@ -96,9 +110,13 @@ export function mapDropboxError(context: DropboxErrorContext): DropletError {
 
   if (
     status === 409 &&
-    ["email_not_verified", "settings_error", "access_denied", "banned_member", "too_many_shared_folders"].includes(errorTag ?? "")
+    SHARED_LINK_CREATION_TAGS.has(errorTag ?? "")
   ) {
-    return createDropletError("SharedLinkCreationFailure", { detail, cause });
+    return createDropletError("SharedLinkCreationFailure", {
+      detail,
+      cause,
+      i18nKey: `DROPLET.errors.SharedLinkCreationFailure.${errorTag}.message`,
+    });
   }
 
   if (status === 429) {
